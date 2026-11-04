@@ -1,3 +1,4 @@
+
 name: Build APK
 
 on:
@@ -8,12 +9,29 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Unzip project
-        run: unzip -o "AbdullahQR_fixed (١).zip" 
+        run: |
+          unzip -o "AbdullahQR_fixed (١).zip" -d extracted
+          echo "Project files:"
+          find extracted -maxdepth 4 -type f | head -100
+
+      - name: Locate Android project
+        run: |
+          PROJECT_DIR=$(find extracted -name gradlew -type f -printf '%h\n' | head -1)
+          if [ -z "$PROJECT_DIR" ]; then
+            PROJECT_DIR=$(find extracted -name settings.gradle -o -name settings.gradle.kts | head -1 | xargs dirname)
+          fi
+          if [ -z "$PROJECT_DIR" ] || [ ! -d "$PROJECT_DIR" ]; then
+            echo "Android project directory not found"
+            exit 1
+          fi
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+          echo "Found project: $PROJECT_DIR"
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -27,13 +45,15 @@ jobs:
           gradle-version: 8.7
 
       - name: Build debug APK
-        working-directory: AbdullahQR
         run: |
+          cd "$PROJECT_DIR"
           gradle wrapper --gradle-version 8.7
+          chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: AbdullahQR-debug-apk
-          path: AbdullahQR/app/build/outputs/apk/debug/app-debug.apk
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
