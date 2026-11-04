@@ -23,14 +23,20 @@ jobs:
       - name: Locate Android project
         run: |
           PROJECT_DIR=$(find extracted -name gradlew -type f -printf '%h\n' | head -1)
+
           if [ -z "$PROJECT_DIR" ]; then
-            PROJECT_DIR=$(find extracted -name settings.gradle -o -name settings.gradle.kts | head -1 | xargs dirname)
+            SETTINGS_FILE=$(find extracted \( -name settings.gradle -o -name settings.gradle.kts \) -type f | head -1)
+            if [ -n "$SETTINGS_FILE" ]; then
+              PROJECT_DIR=$(dirname "$SETTINGS_FILE")
+            fi
           fi
+
           if [ -z "$PROJECT_DIR" ] || [ ! -d "$PROJECT_DIR" ]; then
             echo "Android project directory not found"
             exit 1
           fi
-          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "Found project: $PROJECT_DIR"
 
       - name: Set up Java 17
@@ -43,6 +49,12 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.7
+
+      - name: Enable AndroidX
+        run: |
+          touch "$PROJECT_DIR/gradle.properties"
+          echo "android.useAndroidX=true" >> "$PROJECT_DIR/gradle.properties"
+          echo "android.enableJetifier=true" >> "$PROJECT_DIR/gradle.properties"
 
       - name: Build debug APK
         run: |
